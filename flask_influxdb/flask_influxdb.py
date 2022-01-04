@@ -11,12 +11,13 @@ This means that something has overwritten _app_ctx_stack.top.influxdb_db.
 
 
 class InfluxDB(object):
-    def __init__(self, app: Flask = None) -> None:
+    def __init__(self, app: Flask = None, client=influxdb.InfluxDBClient) -> None:
         """
         Class constructor
         :param app: Flask Application object
         """
         self.app = app
+        self.client = client
         if app is not None:
             self.init_app(app)
 
@@ -49,13 +50,12 @@ class InfluxDB(object):
             if database is not None and create_database:
                 self.database.create(database)
 
-    @staticmethod
-    def connect() -> influxdb.InfluxDBClient:
+    def connect(self) -> [influxdb.InfluxDBClient, influxdb.DataFrameClient]:
         """
         Connect to InfluxDB using configuration parameters
         :return: InfluxDBClient object
         """
-        return influxdb.InfluxDBClient(
+        return self.client(
             host=current_app.config["INFLUXDB_HOST"],
             port=current_app.config["INFLUXDB_PORT"],
             username=current_app.config["INFLUXDB_USER"],
@@ -82,7 +82,7 @@ class InfluxDB(object):
             ctx.influxdb_db.close()
 
     @property
-    def connection(self) -> influxdb.InfluxDBClient:
+    def connection(self) -> [influxdb.InfluxDBClient, influxdb.DataFrameClient]:
         """
         InfluxDBClient object
         :return:
@@ -164,7 +164,7 @@ class InfluxDB(object):
         :return:
         """
         conn = self.connection
-        q = f"SHOW TAG VALUES ON {conn._database} FROM {measurement} WITH KEY = {key}"
+        q = "SHOW TAG VALUES ON {} FROM {} WITH KEY = {}".format(conn._database, measurement, key)
         result = conn.query(query=q, *args, **kwargs)
         values = (p["value"] for p in result.get_points())
         return values
@@ -176,7 +176,7 @@ class InfluxDB(object):
         :return:
         """
         conn = self.connection
-        q = f"SHOW TAG KEYS ON {conn._database} FROM {measurement}"
+        q = "SHOW TAG KEYS ON {} FROM {}".format(conn._database, measurement)
         result = conn.query(query=q, *args, **kwargs)
         keys = (p["tagKey"] for p in result.get_points())
         return keys
